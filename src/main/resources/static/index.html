@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Пользователи и номера</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f2f4f8;
+            color: #222;
+        }
+        .container {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 24px 16px;
+        }
+        h1 { margin-top: 0; }
+        .card {
+            background: #fff;
+            border-radius: 10px;
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+        }
+        .card h2 { margin: 0 0 12px; font-size: 18px; }
+        .row { display: flex; gap: 8px; flex-wrap: wrap; }
+        input, select {
+            flex: 1;
+            min-width: 140px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 15px;
+        }
+        button {
+            padding: 10px 18px;
+            border: none;
+            border-radius: 6px;
+            background: #2563eb;
+            color: #fff;
+            font-size: 15px;
+            cursor: pointer;
+        }
+        button:hover { background: #1d4ed8; }
+        .user {
+            background: #fff;
+            border-radius: 10px;
+            padding: 14px 16px;
+            margin-bottom: 10px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+        }
+        .user h3 { margin: 0 0 8px; }
+        .phone {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 0;
+            border-top: 1px solid #eee;
+        }
+        .badge {
+            background: #e0e7ff;
+            color: #3730a3;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 13px;
+        }
+        .muted { color: #888; margin: 0; }
+        #message { color: #b45309; min-height: 20px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Пользователи и номера</h1>
+
+    <section class="card">
+        <h2>Новый пользователь</h2>
+        <div class="row">
+            <input id="userName" type="text" placeholder="Имя, например Шерзод">
+            <button onclick="addUser()">Добавить</button>
+        </div>
+    </section>
+
+    <section class="card">
+        <h2>Добавить номер пользователю</h2>
+        <div class="row">
+            <select id="userSelect"></select>
+            <input id="phoneNumber" type="text" placeholder="998971234567">
+            <button onclick="addPhone()">Добавить</button>
+        </div>
+    </section>
+
+    <p id="message"></p>
+
+    <h2>Все пользователи</h2>
+    <div id="users"></div>
+</div>
+
+<script>
+    const API_URL = "/users";
+
+    function showMessage(text) {
+        document.getElementById("message").textContent = text;
+    }
+
+    async function loadUsers() {
+        const response = await fetch(API_URL);
+        const users = await response.json();
+        renderUsers(users);
+        fillSelect(users);
+    }
+
+    function fillSelect(users) {
+        const select = document.getElementById("userSelect");
+        select.innerHTML = "";
+        users.forEach(user => {
+            const option = document.createElement("option");
+            option.value = user.id;
+            option.textContent = user.name;
+            select.appendChild(option);
+        });
+    }
+
+    function renderUsers(users) {
+        const container = document.getElementById("users");
+        container.innerHTML = "";
+        users.forEach(user => {
+            const card = document.createElement("div");
+            card.className = "user";
+
+            const title = document.createElement("h3");
+            title.textContent = user.id + ". " + user.name;
+            card.appendChild(title);
+
+            const phones = user.phoneNumbers || [];
+            if (phones.length === 0) {
+                const empty = document.createElement("p");
+                empty.className = "muted";
+                empty.textContent = "Номеров нет";
+                card.appendChild(empty);
+            }
+
+            phones.forEach(phone => {
+                const line = document.createElement("div");
+                line.className = "phone";
+
+                const number = document.createElement("span");
+                number.textContent = phone.number;
+
+                const badge = document.createElement("span");
+                badge.className = "badge";
+                badge.textContent = phone.operator;
+
+                line.appendChild(number);
+                line.appendChild(badge);
+                card.appendChild(line);
+            });
+
+            container.appendChild(card);
+        });
+    }
+
+    async function addUser() {
+        const input = document.getElementById("userName");
+        const name = input.value.trim();
+        if (name === "") {
+            showMessage("Введите имя");
+            return;
+        }
+        const response = await fetch(API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: name })
+        });
+        if (response.ok) {
+            input.value = "";
+            showMessage("Пользователь добавлен");
+            loadUsers();
+        } else {
+            showMessage("Ошибка при добавлении пользователя");
+        }
+    }
+
+    async function addPhone() {
+        const userId = document.getElementById("userSelect").value;
+        const input = document.getElementById("phoneNumber");
+        const number = input.value.trim();
+        if (userId === "") {
+            showMessage("Сначала добавьте пользователя");
+            return;
+        }
+        if (number === "") {
+            showMessage("Введите номер");
+            return;
+        }
+        const response = await fetch(API_URL + "/" + userId + "/phones", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ number: number })
+        });
+        if (response.ok) {
+            input.value = "";
+            showMessage("Номер добавлен");
+            loadUsers();
+        } else {
+            showMessage("Ошибка при добавлении номера");
+        }
+    }
+
+    loadUsers();
+</script>
+</body>
+</html>
