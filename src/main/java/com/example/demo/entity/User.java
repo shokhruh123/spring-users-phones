@@ -1,4 +1,4 @@
-package com.example.demo;
+package com.example.demo.entity;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
@@ -6,7 +6,10 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
+
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
@@ -19,8 +22,9 @@ public class User {
 
     private String name;
 
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
-    private List<PhoneNumber> phoneNumbers;
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("id")
+    private List<PhoneNumber> phoneNumbers = new ArrayList<>();
 
     public Long getId() {
         return id;
@@ -45,3 +49,4 @@ public class User {
     public void setPhoneNumbers(List<PhoneNumber> phoneNumbers) {
         this.phoneNumbers = phoneNumbers;
     }
+}

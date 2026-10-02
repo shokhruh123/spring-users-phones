@@ -1,6 +1,3 @@
-# Users and Phone Numbers
-
-Spring Boot + PostgreSQL. Users can have several phone numbers, the mobile operator is detected automatically from the number prefix. Includes a simple web UI with full CRUD.
 
 ## Run
 
@@ -15,6 +12,7 @@ Spring Boot + PostgreSQL. Users can have several phone numbers, the mobile opera
 | Method | URL | Description |
 |---|---|---|
 | GET | /users | all users with their phones |
+| GET | /users/{id} | one user |
 | POST | /users | create user, body `{"name": "..."}` |
 | PUT | /users/{id} | rename user |
 | DELETE | /users/{id} | delete user and all their phones |
@@ -22,3 +20,14 @@ Spring Boot + PostgreSQL. Users can have several phone numbers, the mobile opera
 | POST | /users/{id}/phones | add phone, body `{"number": "998971234567"}` |
 | PUT | /users/{id}/phones/{phoneId} | change phone number |
 | DELETE | /users/{id}/phones/{phoneId} | delete phone |
+| GET/POST/PUT/DELETE | /messages | messages CRUD |
+
+## Errors
+
+All errors have a single format:
+
+```json
+{ "status": 404, "message": "Пользователь с id 999 не найден" }
+```
+
+`400` for validation errors, `404` when a resource is not found.
