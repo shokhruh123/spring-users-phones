@@ -3,6 +3,7 @@ package com.example.demo.mapper;
 import com.example.demo.dto.PhoneRequest;
 import com.example.demo.dto.PhoneResponse;
 import com.example.demo.entity.PhoneNumber;
+import com.example.demo.util.PhoneNumberNormalizer;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -10,7 +11,7 @@ public class PhoneMapper {
 
     public PhoneNumber toEntity(PhoneRequest request) {
         PhoneNumber phone = new PhoneNumber();
-        phone.setNumber(request.number().trim());
+        phone.setNumber(PhoneNumberNormalizer.normalize(request.number()));
         return phone;
     }
 

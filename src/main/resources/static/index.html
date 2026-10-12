@@ -6,69 +6,28 @@
     <title>Пользователи и номера</title>
     <style>
         * { box-sizing: border-box; }
-        body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-            background: #f2f4f8;
-            color: #222;
-        }
-        .container {
-            max-width: 720px;
-            margin: 0 auto;
-            padding: 24px 16px;
-        }
+        body { margin: 0; font-family: Arial, sans-serif; background: #f2f4f8; color: #222; }
+        .container { max-width: 760px; margin: 0 auto; padding: 24px 16px; }
         h1 { margin-top: 0; }
-        .card {
-            background: #fff;
-            border-radius: 10px;
-            padding: 16px;
-            margin-bottom: 16px;
-            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
-        }
+        .card, .user { background: #fff; border-radius: 10px; padding: 16px; margin-bottom: 14px; box-shadow: 0 1px 4px rgba(0,0,0,.1); }
         .card h2 { margin: 0 0 12px; font-size: 18px; }
-        .row { display: flex; gap: 8px; flex-wrap: wrap; }
-        input, select {
-            flex: 1;
-            min-width: 140px;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            font-size: 15px;
-        }
-        button {
-            padding: 10px 18px;
-            border: none;
-            border-radius: 6px;
-            background: #2563eb;
-            color: #fff;
-            font-size: 15px;
-            cursor: pointer;
-        }
+        .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        input, select { flex: 1; min-width: 140px; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 15px; }
+        button { padding: 8px 14px; border: none; border-radius: 6px; background: #2563eb; color: #fff; font-size: 14px; cursor: pointer; }
         button:hover { background: #1d4ed8; }
-        .user {
-            background: #fff;
-            border-radius: 10px;
-            padding: 14px 16px;
-            margin-bottom: 10px;
-            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
-        }
-        .user h3 { margin: 0 0 8px; }
-        .phone {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 6px 0;
-            border-top: 1px solid #eee;
-        }
-        .badge {
-            background: #e0e7ff;
-            color: #3730a3;
-            padding: 3px 10px;
-            border-radius: 12px;
-            font-size: 13px;
-        }
+        button.light { background: #e5e7eb; color: #222; }
+        button.light:hover { background: #d1d5db; }
+        button.danger { background: #dc2626; }
+        button.danger:hover { background: #b91c1c; }
+        .user-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+        .user-head h3 { margin: 0; }
+        .phone { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 0; border-top: 1px solid #eee; }
+        .phone-info { display: flex; align-items: center; gap: 10px; }
+        .actions { display: flex; gap: 6px; }
+        .badge { background: #e0e7ff; color: #3730a3; padding: 3px 10px; border-radius: 12px; font-size: 13px; }
         .muted { color: #888; margin: 0; }
         #message { color: #b45309; min-height: 20px; }
+        #message.ok { color: #15803d; }
     </style>
 </head>
 <body>
@@ -94,45 +53,112 @@
 
     <p id="message"></p>
 
-    <h2>Все пользователи</h2>
+    <div class="row" style="margin-bottom: 12px;">
+        <h2 style="margin: 0;">Все пользователи</h2>
+        <input id="search" type="text" placeholder="Поиск по имени" oninput="applyFilter()">
+    </div>
     <div id="users"></div>
 </div>
 
 <script>
     const API_URL = "/users";
+    let allUsers = [];
 
-    function showMessage(text) {
-        document.getElementById("message").textContent = text;
+    function showMessage(text, isOk) {
+        const element = document.getElementById("message");
+        element.textContent = text;
+        element.className = isOk ? "ok" : "";
+    }
+
+    async function readError(response) {
+        try {
+            const data = await response.json();
+            return data.message || "Ошибка";
+        } catch (e) {
+            return "Ошибка сервера";
+        }
+    }
+
+    function send(url, method, body) {
+        const options = { method: method, headers: { "Content-Type": "application/json" } };
+        if (body) {
+            options.body = JSON.stringify(body);
+        }
+        return fetch(url, options);
+    }
+
+    function formatPhone(digits) {
+        if (digits.length !== 12) {
+            return digits;
+        }
+        return "+" + digits.slice(0, 3) + " " + digits.slice(3, 5) + " " + digits.slice(5, 8) + " " + digits.slice(8, 10) + " " + digits.slice(10, 12);
+    }
+
+    function makeButton(text, className, handler) {
+        const button = document.createElement("button");
+        button.textContent = text;
+        if (className) {
+            button.className = className;
+        }
+        button.addEventListener("click", handler);
+        return button;
     }
 
     async function loadUsers() {
         const response = await fetch(API_URL);
-        const users = await response.json();
-        renderUsers(users);
-        fillSelect(users);
+        allUsers = await response.json();
+        fillSelect();
+        applyFilter();
     }
 
-    function fillSelect(users) {
+    function fillSelect() {
         const select = document.getElementById("userSelect");
+        const selected = select.value;
         select.innerHTML = "";
-        users.forEach(user => {
+        allUsers.forEach(user => {
             const option = document.createElement("option");
             option.value = user.id;
             option.textContent = user.name;
             select.appendChild(option);
         });
+        if (selected) {
+            select.value = selected;
+        }
+    }
+
+    function applyFilter() {
+        const text = document.getElementById("search").value.trim().toLowerCase();
+        const filtered = allUsers.filter(user => user.name.toLowerCase().includes(text));
+        renderUsers(filtered);
     }
 
     function renderUsers(users) {
         const container = document.getElementById("users");
         container.innerHTML = "";
+
+        if (users.length === 0) {
+            const empty = document.createElement("p");
+            empty.className = "muted";
+            empty.textContent = "Ничего не найдено";
+            container.appendChild(empty);
+            return;
+        }
+
         users.forEach(user => {
             const card = document.createElement("div");
             card.className = "user";
 
+            const head = document.createElement("div");
+            head.className = "user-head";
             const title = document.createElement("h3");
             title.textContent = user.id + ". " + user.name;
-            card.appendChild(title);
+            const actions = document.createElement("div");
+            actions.className = "actions";
+            actions.appendChild(makeButton("Изменить", "light", () => renameUser(user)));
+            actions.appendChild(makeButton("Удалить", "danger", () => deleteUser(user)));
+            head.appendChild(title);
+            head.appendChild(actions);
+            card.appendChild(head);
 
             const phones = user.phoneNumbers || [];
             if (phones.length === 0) {
@@ -146,15 +172,23 @@
                 const line = document.createElement("div");
                 line.className = "phone";
 
+                const info = document.createElement("div");
+                info.className = "phone-info";
                 const number = document.createElement("span");
-                number.textContent = phone.number;
-
+                number.textContent = formatPhone(phone.number);
                 const badge = document.createElement("span");
                 badge.className = "badge";
                 badge.textContent = phone.operator;
+                info.appendChild(number);
+                info.appendChild(badge);
 
-                line.appendChild(number);
-                line.appendChild(badge);
+                const phoneActions = document.createElement("div");
+                phoneActions.className = "actions";
+                phoneActions.appendChild(makeButton("Изменить", "light", () => editPhone(user, phone)));
+                phoneActions.appendChild(makeButton("Удалить", "danger", () => deletePhone(user, phone)));
+
+                line.appendChild(info);
+                line.appendChild(phoneActions);
                 card.appendChild(line);
             });
 
@@ -166,21 +200,44 @@
         const input = document.getElementById("userName");
         const name = input.value.trim();
         if (name === "") {
-            showMessage("Введите имя");
+            showMessage("Введите имя", false);
             return;
         }
-        const response = await fetch(API_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name: name })
-        });
+        const response = await send(API_URL, "POST", { name: name });
         if (response.ok) {
             input.value = "";
-            showMessage("Пользователь добавлен");
+            showMessage("Пользователь добавлен", true);
             loadUsers();
         } else {
-            showMessage("Ошибка при добавлении пользователя");
+            showMessage(await readError(response), false);
         }
+    }
+
+    async function renameUser(user) {
+        const name = prompt("Новое имя:", user.name);
+        if (name === null || name.trim() === "") {
+            return;
+        }
+        const response = await send(API_URL + "/" + user.id, "PUT", { name: name.trim() });
+        if (response.ok) {
+            showMessage("Имя изменено", true);
+        } else {
+            showMessage(await readError(response), false);
+        }
+        loadUsers();
+    }
+
+    async function deleteUser(user) {
+        if (!confirm("Удалить пользователя " + user.name + " вместе с его номерами?")) {
+            return;
+        }
+        const response = await send(API_URL + "/" + user.id, "DELETE");
+        if (response.ok) {
+            showMessage("Пользователь удалён", true);
+        } else {
+            showMessage(await readError(response), false);
+        }
+        loadUsers();
     }
 
     async function addPhone() {
@@ -188,25 +245,48 @@
         const input = document.getElementById("phoneNumber");
         const number = input.value.trim();
         if (userId === "") {
-            showMessage("Сначала добавьте пользователя");
+            showMessage("Сначала добавьте пользователя", false);
             return;
         }
         if (number === "") {
-            showMessage("Введите номер");
+            showMessage("Введите номер", false);
             return;
         }
-        const response = await fetch(API_URL + "/" + userId + "/phones", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ number: number })
-        });
+        const response = await send(API_URL + "/" + userId + "/phones", "POST", { number: number });
         if (response.ok) {
             input.value = "";
-            showMessage("Номер добавлен");
-            loadUsers();
+            showMessage("Номер добавлен", true);
         } else {
-            showMessage("Ошибка при добавлении номера");
+            showMessage(await readError(response), false);
         }
+        loadUsers();
+    }
+
+    async function editPhone(user, phone) {
+        const number = prompt("Новый номер:", phone.number);
+        if (number === null || number.trim() === "") {
+            return;
+        }
+        const response = await send(API_URL + "/" + user.id + "/phones/" + phone.id, "PUT", { number: number.trim() });
+        if (response.ok) {
+            showMessage("Номер изменён", true);
+        } else {
+            showMessage(await readError(response), false);
+        }
+        loadUsers();
+    }
+
+    async function deletePhone(user, phone) {
+        if (!confirm("Удалить номер " + formatPhone(phone.number) + "?")) {
+            return;
+        }
+        const response = await send(API_URL + "/" + user.id + "/phones/" + phone.id, "DELETE");
+        if (response.ok) {
+            showMessage("Номер удалён", true);
+        } else {
+            showMessage(await readError(response), false);
+        }
+        loadUsers();
     }
 
     loadUsers();

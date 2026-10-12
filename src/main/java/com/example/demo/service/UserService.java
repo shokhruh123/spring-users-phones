@@ -6,11 +6,13 @@ import com.example.demo.dto.UserRequest;
 import com.example.demo.dto.UserResponse;
 import com.example.demo.entity.PhoneNumber;
 import com.example.demo.entity.User;
+import com.example.demo.exception.ConflictException;
 import com.example.demo.exception.ResourceNotFoundException;
 import com.example.demo.mapper.PhoneMapper;
 import com.example.demo.mapper.UserMapper;
 import com.example.demo.repository.PhoneNumberRepository;
 import com.example.demo.repository.UserRepository;
+import com.example.demo.util.PhoneNumberNormalizer;
 import com.example.demo.util.PhoneOperatorResolver;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -76,6 +78,7 @@ public class UserService {
     public PhoneResponse addPhone(Long userId, PhoneRequest request) {
         User user = getUserOrThrow(userId);
         PhoneNumber phone = phoneMapper.toEntity(request);
+        ensureNumberFree(phone.getNumber(), null);
         phone.setOperator(PhoneOperatorResolver.resolve(phone.getNumber()));
         phone.setUser(user);
         return phoneMapper.toResponse(phoneNumberRepository.save(phone));
@@ -85,8 +88,10 @@ public class UserService {
     public PhoneResponse updatePhone(Long userId, Long phoneId, PhoneRequest request) {
         User user = getUserOrThrow(userId);
         PhoneNumber phone = getPhoneOrThrow(user, phoneId);
-        phone.setNumber(request.number().trim());
-        phone.setOperator(PhoneOperatorResolver.resolve(phone.getNumber()));
+        String newNumber = PhoneNumberNormalizer.normalize(request.number());
+        ensureNumberFree(newNumber, phoneId);
+        phone.setNumber(newNumber);
+        phone.setOperator(PhoneOperatorResolver.resolve(newNumber));
         return phoneMapper.toResponse(phone);
     }
 
@@ -108,5 +113,15 @@ public class UserService {
                 .findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Номер с id " + phoneId + " у пользователя " + user.getId() + " не найден"));
+    }
+
+    private void ensureNumberFree(String number, Long ownPhoneId) {
+        phoneNumberRepository.findAll().stream()
+                .filter(phone -> phone.getNumber().equals(number))
+                .filter(phone -> ownPhoneId == null || !phone.getId().equals(ownPhoneId))
+                .findAny()
+                .ifPresent(phone -> {
+                    throw new ConflictException("Номер " + number + " уже занят");
+                });
     }
 }
